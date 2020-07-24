@@ -1,0 +1,473 @@
+#include <reg51.h>
+#include <stdio.h>
+
+sbit floor1 = P1^1;
+sbit floor2 = P1^2;
+sbit floor3 = P1^3;
+sbit floor4 = P1^4;
+
+sbit demand1 = P0^7;
+sbit demand2 = P1^5;
+sbit demand3 = P1^6;
+sbit demand4 = P1^7;
+
+sbit req1u = P0^6;
+sbit req2u = P0^4;
+sbit req2d = P0^5;
+sbit req3u = P0^2;
+sbit req3d = P0^3;
+sbit req4d = P0^1;
+
+sbit show_req_1u = P2^5;
+sbit show_req_2d = P2^4;
+sbit show_req_2u = P2^3;
+sbit show_req_3d = P2^2;
+sbit show_req_3u = P2^1;
+sbit show_req_4d = P2^0;
+
+sbit show_dir_up = P2^7;
+sbit show_dir_down = P2^6;
+
+sbit door_open_closed = P1^0;
+
+int ArrUp[4] = {0,0,0,0};
+int ArrDown[4] = {0,0,0,0};
+int ArrDemand[4] = {0,0,0,0};
+
+int current_direction = 0; //Direction - Up (1), Down(2) and At rest(0)
+int current_floor = 1; //Postion - Floor 1-(1), Floor 2-(2), Floor 3-(3), Floor 4-(4)
+
+void call_delay(void);
+void check_requests(void);
+void check_demands(void);
+void check_direction(void);
+void update_direction(int);
+void update_current_floor(int);
+void move_lift_up(void);
+void move_lift_down(void);
+
+int i = 0, check = 0;
+
+void ISR_ex0(void) interrupt 0 {
+	
+	
+		
+		if(current_direction == 1){
+			
+			move_lift_up();
+			
+	}
+		
+		if(current_direction == 2 && check == 0){
+			
+			move_lift_down();
+			
+		}
+		check = 0;
+}
+
+void main (){
+
+	P0 = 0xFF;
+	P1 = 0xE0;
+	P2 = 0x00;
+	
+	IT0 = 1;   // Configure interrupt 0 for falling edge on /INT0 (P3.2)
+	EX0 = 1;   // Enable EX0 Interrupt
+	EA = 1;    // Enable Global Interrupt Flag
+	
+	door_open_closed = 0;
+	floor1 = 1; // Currently lift is at floor 1 or also called as ground floor
+	
+while(1){
+	
+	check_requests();
+	check_demands();
+	check_direction();
+	
+	}
+}
+
+void move_lift_up(void){
+	
+	if(current_floor == 1){
+				
+				if(ArrUp[0] == 1 || ArrUp[1] == 1 || ArrUp[2] == 1 || ArrDown[1] == 1 || ArrDown[2] == 1 || ArrDemand[1] == 1 || ArrDemand[2] == 1 || ArrDemand[3] == 1){
+					update_current_floor(2);
+				
+				if(ArrUp[0] == 1 || ArrDemand[1] == 1 || ArrDown[1] == 1){
+					
+					if(ArrUp[0] == 1){
+					show_req_2u = 0;
+					ArrUp[0] = 0;
+				}
+					if(ArrDemand[1] == 1){
+					 ArrDemand[1] = 0;
+				}
+					
+					if(ArrUp[1] == 0 && ArrUp[2] == 0 && ArrDemand[2] == 0 && ArrDemand[3] == 0){
+						if(ArrDown[1] == 1){
+							ArrDown[1] = 0;
+							show_req_2d = 0;
+							update_direction(0);
+							check = 1;
+							call_delay();
+							return;
+						}
+					update_direction(0);
+					}
+					
+					call_delay();
+					return;
+				}
+				return;
+			}
+		}
+	
+	if(current_floor == 2){
+				
+				if(ArrUp[1] == 1 || ArrUp[2] == 1 || ArrDown[2] == 1 || ArrDemand[2] == 1 || ArrDemand[3] == 1){
+					update_current_floor(3);
+					
+				if(ArrUp[1] == 1 || ArrDemand[2] == 1 || ArrDown[2] == 1){
+					
+					if(ArrUp[1] == 1){
+					show_req_3u = 0;
+					ArrUp[1] = 0;
+					}
+					if(ArrDemand[2] == 1){
+						ArrDemand[2] = 0;	
+					}
+					
+					if(ArrUp[2] == 0 && ArrDemand[3] == 0){
+						if(ArrDown[2] == 1){
+							ArrDown[2] = 0;
+							show_req_3d = 0;
+							update_direction(0);
+							check = 1;
+							call_delay();
+							return;
+						}
+						if(ArrDown[1] == 1 || ArrDown[0] == 1 || ArrDemand[0] == 1 || ArrDemand[1] == 1){
+							update_direction(2);
+							check = 1;
+							call_delay();
+							return;
+						}
+					update_direction(0);
+					}
+					
+					call_delay();
+					return;
+				}
+				return;
+			}
+		}
+		
+	if(current_floor == 3){
+				
+				if(ArrUp[2] == 1 || ArrDemand[3] == 1){
+					update_current_floor(4);
+					
+					if(ArrUp[2] == 1){
+					show_req_4d = 0;
+					ArrUp[2] = 0;
+					}
+					if(ArrDemand[3] == 1){
+					ArrDemand[3] = 0;
+					}
+					
+					if(ArrDown[0] == 0 && ArrDown[1] == 0 && ArrDown[2] == 0 && ArrUp[0] == 0 && ArrUp[1] == 0 && ArrUp[2] == 0 && ArrDemand[0] == 0 && ArrDemand[1] == 0 && ArrDemand[2] == 0){update_direction(0);}
+						else{update_direction(2);}
+					
+					check = 1;
+					call_delay();
+					return;
+				}
+			}
+}
+
+void move_lift_down(void){
+	
+	if(current_floor == 4){
+	
+		if(ArrDown[0] == 1 ||ArrDown[1] == 1 || ArrDown[2] == 1 || ArrUp[0] == 1 || ArrUp[1] == 1 || ArrDemand[0] == 1 || ArrDemand[1] == 1 || ArrDemand[2] == 1){
+					update_current_floor(3);
+					
+				if(ArrDown[2] == 1 || ArrUp[1] == 1 || ArrDemand[2] == 1){
+					
+					if(ArrDown[2] == 1){
+					show_req_3d = 0;
+					ArrDown[2] = 0;
+					}
+					if(ArrDemand[2] == 1){
+						ArrDemand[2] = 0;
+					}
+					
+					if(ArrDown[0] == 0 && ArrDown[1] == 0 && ArrUp[0] == 0 && ArrDemand[0] == 0 && ArrDemand[1] == 0){
+						
+						if(ArrUp[1] == 1){
+							show_req_3u = 0;
+							ArrUp[1] = 0;
+							update_direction(0);
+							call_delay();
+							return;
+						}
+						
+					update_direction(0);
+					}
+					
+					call_delay();
+					return;
+				}
+				return;
+			}
+		}
+	
+	if(current_floor == 3){
+	
+		if(ArrDown[0] == 1 || ArrDown[1] == 1 || ArrUp[0] == 1 || ArrDemand[0] == 1 || ArrDemand[1] == 1){
+					update_current_floor(2);
+					
+				if(ArrDown[1] == 1 || ArrUp[0] == 1 || ArrDemand[1] == 1){
+					
+					if(ArrDown[1] == 1){
+					show_req_2d = 0;
+					ArrDown[1] = 0;
+					}
+					if(ArrDemand[1] == 1){
+					ArrDemand[1] = 0;
+					}
+					
+					if(ArrDown[0] == 0 && ArrDemand[0] == 0){
+						
+						if(ArrUp[0] == 1){
+							show_req_2u = 0;
+							ArrUp[0] = 0;
+							update_direction(0);
+							call_delay();
+							return;
+						}
+					update_direction(0);
+					}
+					
+					call_delay();
+					return;
+				}
+				return;
+			}
+		}
+		
+	if(current_floor == 2){
+	
+		if(ArrDown[0] == 1 || ArrDemand[0] == 1){
+					update_current_floor(1);
+					
+				if(ArrDown[0] == 1 || ArrDemand[0] == 1){
+					
+					if(ArrDown[0] == 1){
+					show_req_1u = 0;
+					ArrDown[0] = 0;
+					}
+					if(ArrDemand[0] == 1){
+					ArrDemand[0] = 0;
+					}
+						
+					if(ArrUp[0] == 0 && ArrUp[1] == 0 && ArrUp[2] == 0 && ArrDown[1] == 0 && ArrDown[2] == 0 && ArrDemand[0] == 0 && ArrDemand[1] == 0 && ArrDemand[2] == 0 && ArrDemand[3] == 0){
+						
+					update_direction(0);
+					}
+					else{update_direction(1);}
+					
+					call_delay();
+					return;
+				}
+				return;
+			}
+		}
+		
+}
+
+void update_current_floor(int newFloor){
+	
+	if(newFloor == 1){
+		floor1 = 1;
+		floor2 = 0;
+		floor3 = 0;
+		floor4 = 0;
+		current_floor = 1;
+	}
+	if(newFloor == 2){
+		floor1 = 0;
+		floor2 = 1;
+		floor3 = 0;
+		floor4 = 0;
+		current_floor = 2;
+	}
+	if(newFloor == 3){
+		floor1 = 0;
+		floor2 = 0;
+		floor3 = 1;
+		floor4 = 0;
+		current_floor = 3;
+	}
+	if(newFloor == 4){
+		floor1 = 0;
+		floor2 = 0;
+		floor3 = 0;
+		floor4 = 1;
+		current_floor = 4;
+	}
+}
+
+void check_direction(void){
+	
+	if(current_floor == 1 && current_direction == 0){
+		
+		if(req2u == 1 || req2d == 1 || ArrDemand[1] == 1){update_direction(1);}
+			
+		if(req3u == 1 || req3d == 1 || ArrDemand[2] == 1){update_direction(1);}
+				
+		if(req4d == 1 || ArrDemand[3] == 1){update_direction(1);}
+		
+			}
+	
+	if(current_floor == 2 && current_direction == 0){
+		
+		if(req1u == 1 || ArrDemand[0] == 1){update_direction(2);}
+			
+		if(req3u == 1 || req3d == 1 || ArrDemand[2] == 1){update_direction(1);}
+				
+		if(req4d == 1 || ArrDemand[3] == 1){update_direction(1);}
+		
+		}
+		
+	if(current_floor == 3 && current_direction == 0){
+		
+		if(req1u == 1 || ArrDemand[0] == 1){update_direction(2);}
+			
+		if(req2u == 1 || req2d == 1 || ArrDemand[1] == 1){update_direction(2);}
+				
+		if(req4d == 1 || ArrDemand[3] == 1){update_direction(1);}
+		
+		}
+		
+	if(current_floor == 4 && current_direction == 0){
+		
+		if(req1u == 1 || ArrDemand[0] == 1){update_direction(2);}
+			
+		if(req2u == 1 || req2d == 1 || ArrDemand[1] == 1){update_direction(2);}
+			
+		if(req3u == 1 || req3d == 1 || ArrDemand[2] == 1){update_direction(2);}
+				
+	}
+	
+}
+
+void update_direction(int temp){
+	
+	if(temp == 0){
+		current_direction = 0;
+		show_dir_up = 0;
+		show_dir_down = 0;
+	}
+	
+	if(temp == 1){
+		current_direction = 1;
+		show_dir_up = 1;
+		show_dir_down = 0;
+	}
+	
+	if(temp == 2){
+		current_direction = 2;
+		show_dir_up = 0;
+		show_dir_down = 1;
+	}
+}
+
+void check_requests(){
+	
+	if(req1u == 1 && current_floor != 1){
+		show_req_1u = 1;
+		ArrDown[0] = 1;
+	}
+	
+	if(req2u == 1 && current_floor != 2){
+		show_req_2u = 1;
+		ArrUp[0] = 1;
+	}
+	
+	if(req2d == 1 && current_floor != 2){
+		show_req_2d = 1;
+		ArrDown[1] = 1;
+	}
+	
+	if(req3u == 1 && current_floor != 3){
+		show_req_3u = 1;
+		ArrUp[1] = 1;
+	}
+	
+	if(req3d == 1 && current_floor != 3){
+		show_req_3d = 1;
+		ArrDown[2] = 1;
+	}
+	
+	if(req4d == 1 && current_floor != 4){
+		show_req_4d = 1;
+		ArrUp[2] = 1;
+	}
+	
+}
+
+void check_demands(){
+	
+	if(demand1 == 1){
+		ArrDemand[0] = 1;
+	}
+
+	if(demand2 == 1){
+		ArrDemand[1] = 1;
+	}
+	
+	if(demand3 == 1){
+		ArrDemand[2] = 1;
+	}
+	
+	if(demand4 == 1){
+		ArrDemand[3] = 1;
+	}
+	
+}
+
+void call_delay(){
+
+	TMOD = 0x01; // Timer0 mode#1
+
+	TH0=0xD8;              
+
+	TL0=0xF0;
+
+	door_open_closed = 1;
+	
+	for(i =0; i < 79;i++){
+	
+	TR0 = 1; 
+
+	while (TF0 == 0){
+		check_requests();
+		check_demands();
+		check_direction();
+	}
+
+	TR0 = 0;
+
+	TF0 = 0;
+	
+	check_requests();
+	check_demands();
+	check_direction();
+	
+	}
+	
+	door_open_closed = 0;
+}
